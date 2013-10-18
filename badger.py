@@ -35,7 +35,6 @@ class Badger(object):
 				while 0xFFFFFFFA < d:
 					# UNTESTED
 					if sparefinalkeyindex == 4:
-						print "..."
 						sparefinalkey = rabbit.prng(16)
 						sparefinalkeyindex = 0
 					k = bytearray(4)
@@ -55,7 +54,8 @@ class Badger(object):
 				index = 8*(4*i + j)
 				self.levelkey[i].append(b_to_int64(levelkeydata[index:index+8]))
 
-	def process(self, src, length, srcoffset):
+	def process(self, src, length):
+		srcoffset = 0
 		if self.bufferindex > 0:
 			while length > 0 and self.bufferindex < 16:
 				self.buffer[self.bufferindex] = src[srcoffset]
@@ -95,7 +95,7 @@ class Badger(object):
 		level = 0
 		rightfilled = False
 
-		print self.bitcount
+
 		self.bitcount += 8 * self.bufferindex
 		if self.bufferindex > 0:
 			if self.bufferindex <= 8:
@@ -104,7 +104,7 @@ class Badger(object):
 					self.bufferindex += 1
 
 				for i in xrange(4):
-					right[i] = b_to_int(self.buffer[0:4])
+					right[i] = b_to_int64(self.buffer[0:8])
 			else:
 				while self.bufferindex < 16:
 					self.buffer[self.bufferindex] = 0
@@ -119,12 +119,9 @@ class Badger(object):
 					t1 = (lk + bufpart0) & 0xFFFFFFFF
 					t2 = ((lk >> 32) + bufpart1) & 0xFFFFFFFF
 					right[i] = (t1 * t2) + bufpart2
-					print hex(right[i])
 
 			rightfilled = True
 
-
-			# print i, ":", hex(y[0]), hex(y[1]), hex(y[2]), hex(y[3])
 
 		if buffermask == 0 and not self.bufferindex:
 			for i in xrange(4):
@@ -138,12 +135,13 @@ class Badger(object):
 				level += 1
 				buffermask >>= 1
 
+
 			while buffermask:
 				if buffermask & 1:
 					for i in xrange(4):
 						t1 = (self.levelkey[level+1][counter] & 0xFFFFFFFF) + (self.treebuffer[level][counter] & 0xFFFFFFFF) & 0xFFFFFFFF
-						t2 = (self.levelkey[level+1][counter] & 0xFFFFFFFF00000000) + (self.treebuffer[level][counter] & 0xFFFFFFFF00000000) & 0xFFFFFFFF
-						right[i] += t1 * t2
+						t2 = (self.levelkey[level+1][counter] >> 32) + (self.treebuffer[level][counter] >> 32) & 0xFFFFFFFF
+						right[i] += (t1 * t2)
 						counter += 1
 						if counter >= 4:
 							counter -= 4
@@ -151,7 +149,6 @@ class Badger(object):
 				else:
 					level += 1
 				buffermask >>= 1
-
 
 		mac = bytearray(16)
 		for i in xrange(4):
@@ -189,8 +186,8 @@ class Badger(object):
 
 			left = macbuffer[level][counter]
 			level += 1
-			buffermask >> 1
-		macbuffer[level][counter] = right
+			buffermask = buffermask >> 1
+		macbuffer[level][counter] = right & 0xFFFFFFFFFFFFFFFF
 
 
 if __name__ == '__main__':
@@ -200,8 +197,9 @@ if __name__ == '__main__':
 	# d = bytearray(b"Hello my good man - How art thou?!")
 		# print level, counter, right, left,
 	d = bytearray([0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7,0x8,0x9,0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7,0x8,0x9,0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7,0x8,0x9,0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7,0x8,0x9])
+	d2 = bytearray([0xAA] * 1024)
 	# d = bytearray(b"Hello my good man - How art thou?!")
-	a.process(d, 17, 0)
+	a.process(d2, 37)
 	c = bytearray([i for i in range(8)])
 	h = bytearray(8)
 	c = a.finalize(c)
